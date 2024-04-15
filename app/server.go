@@ -51,13 +51,20 @@ func handleConnection(conn net.Conn) {
 	}
 	hasPath := requestLines[0]
 	path := (strings.Split(hasPath, " "))[1]
-	omitEcho := strings.Split(path, "/echo/")
-	resp := "HTTP/1.1 200 OK\r\n"
+	resp := ""
+	if path == "/" { //stage 3
+		resp = "HTTP/1.1 200 OK\r\n"
+	} else {
+		resp = "HTTP/1.1 400 NOT FOUND\r\n"
+	}
 	resp += "Content-Type: text/plain\r\n"
+	omitEcho := strings.Split(path, "/echo/") //stage 4
 	if len(omitEcho) > 1 {
 		fmt.Println(omitEcho[1])
 		resp += fmt.Sprintf("Content-Length: %d\r\n\r\n", len([]byte(omitEcho[1])))
 		resp += omitEcho[1]
+	} else {
+		resp += "Content-Length: 0\r\n\r\n"
 	}
 	_, err := conn.Write([]byte(resp))
 	if err != nil {
