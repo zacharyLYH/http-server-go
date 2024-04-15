@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -16,33 +17,46 @@ func main() {
 	}
 	defer l.Close()
 
-	// Accept new connections.
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			continue
+		}
+
+		go handleConnection(conn)
 	}
+}
+
+func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	fmt.Println("Connection accepted")
 
-	// Create a new reader from the connection
 	reader := bufio.NewReader(conn)
 
-	// Read data from the connection
-	// You can specify your own buffer size or use bufio for simplicity
+	var requestLines []string
 	for {
 		line, err := reader.ReadString('\n')
+		if strings.TrimRight(line, "\r\n") == "" {
+			break
+		}
 		if err != nil {
 			fmt.Println("Error reading from connection:", err.Error())
 			break
 		}
-		fmt.Print("Received: ", line)
-		resp := "HTTP/1.1 200 OK\r\n\r\n"
-		conn.Write([]byte(resp))
-		if err != nil {
-			fmt.Println("Error writing response to connection:", err.Error())
-			break
-		}
+		requestLines = append(requestLines, line)
+	}
+	hasPath := requestLines[0]
+	path := (strings.Split(hasPath, " "))[1]
+	resp := ""
+	if path == "/" {
+		resp = "HTTP/1.1 200 OK\r\n\r\n"
+	} else {
+		resp = "HTTP/1.1 404 NOT FOUND\r\n\r\n"
+	}
+	_, err := conn.Write([]byte(resp))
+	if err != nil {
+		fmt.Println("Error writing response to connection:", err.Error())
 	}
 }
