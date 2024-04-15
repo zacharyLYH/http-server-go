@@ -55,7 +55,7 @@ func handleConnection(conn net.Conn) {
 	if path == "/" { //stage 3
 		resp = "HTTP/1.1 200 OK\r\n"
 	} else {
-		resp = "HTTP/1.1 400 NOT FOUND\r\n"
+		resp = "HTTP/1.1 404 NOT FOUND\r\n"
 	}
 	resp += "Content-Type: text/plain\r\n"
 	omitEcho := strings.Split(path, "/echo/") //stage 4
