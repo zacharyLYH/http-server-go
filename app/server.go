@@ -26,7 +26,7 @@ func main() {
 			continue
 		}
 
-		go handleConnection(conn)
+		go handleConnection(conn) //stage 6. should handle concurrent connections easily
 	}
 }
 
