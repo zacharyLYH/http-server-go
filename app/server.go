@@ -33,7 +33,7 @@ func main() {
 			continue
 		}
 
-		go handleConnection(conn,extraArg) //stage 6. should handle concurrent connections easily
+		go handleConnection(conn, extraArg) //stage 6. should handle concurrent connections easily
 	}
 }
 
@@ -42,16 +42,18 @@ func handleConnection(conn net.Conn, extraArg string) {
 
 	fmt.Println("Connection accepted")
 
-	if(extraArg != ""){
+	if extraArg != "" {
 		fmt.Println("Passed in argument: ", extraArg)
 	}
 
 	reader := bufio.NewReader(conn)
 
 	var requestLines []string
+	bodyLength := 0
 	for {
 		line, err := reader.ReadString('\n')
-		if strings.TrimRight(line, "\r\n") == "" {
+		trimmedLine := strings.TrimRight(line, "\r\n")
+		if trimmedLine == "" {
 			break
 		}
 		fmt.Println("Header: ", line)
@@ -60,6 +62,12 @@ func handleConnection(conn net.Conn, extraArg string) {
 			break
 		}
 		requestLines = append(requestLines, line)
+		if strings.HasPrefix(trimmedLine, "Content-Length:") {
+			parts := strings.SplitN(trimmedLine, ":", 2)
+			if len(parts) == 2 {
+				fmt.Sscanf(parts[1], "%d", &bodyLength)
+			}
+		}
 	}
 	hasPath := requestLines[0]
 	userAgent := "" //stage 5
@@ -71,8 +79,8 @@ func handleConnection(conn net.Conn, extraArg string) {
 	method := (strings.Split(hasPath, " "))[0]
 	path := (strings.Split(hasPath, " "))[1]
 	omitEcho := strings.Split(path, "/echo/") //stage 4
-	var linesRead string 
-	filesPrefix := strings.Split(path, "/files/") //stage 7 
+	var linesRead string
+	filesPrefix := strings.Split(path, "/files/") //stage 7
 	resp := ""
 	if path == "/" || len(omitEcho) > 1 || path == "/user-agent" { //stage 3
 		resp = "HTTP/1.1 200 OK\r\n"
@@ -80,11 +88,11 @@ func handleConnection(conn net.Conn, extraArg string) {
 	} else if len(filesPrefix) > 1 {
 		fmt.Println("File name being requested: ", filesPrefix[1])
 		fileName := filesPrefix[1]
-		if(method == "GET"){
-			file, err := os.Open(extraArg+fileName)
+		if method == "GET" {
+			file, err := os.Open(extraArg + fileName)
 			if err != nil {
 				resp = "HTTP/1.1 404 NOT FOUND\r\n"
-			}else{
+			} else {
 				defer file.Close()
 				scanner := bufio.NewScanner(file)
 				for scanner.Scan() {
@@ -94,22 +102,29 @@ func handleConnection(conn net.Conn, extraArg string) {
 				resp = "HTTP/1.1 200 OK\r\n"
 			}
 			resp += "Content-Type: application/octet-stream\r\n"
-		}else if(method == "POST"){
-			fmt.Println("Writing to file: ",extraArg+fileName)
-			file, err := os.Create(extraArg+fileName)
+		} else if method == "POST" {
+			fmt.Println("Writing to file: ", extraArg+fileName)
+			file, err := os.Create(extraArg + fileName)
 			if err != nil {
 				fmt.Println("Error creating file:", err)
 				return
 			}
-			defer file.Close() 
-			data := requestLines[len(requestLines)-1]
-			fmt.Println("Data to write: ", data)
-			_, err = file.WriteString(data)
-			if err != nil {
-				fmt.Println("Error writing to file:", err)
-				return
+			defer file.Close()
+			if bodyLength > 1 {
+				data := make([]byte, bodyLength)
+				_, err := reader.Read(data)
+				if err != nil {
+					fmt.Println("Error reading body from connection:", err.Error())
+					return
+				}
+				fmt.Println("Data to write: ", data)
+				_, err = file.Write(data)
+				if err != nil {
+					fmt.Println("Error writing to file:", err)
+					return
+				}
+				resp = "HTTP/1.1 201 CREATED\r\n"
 			}
-			resp = "HTTP/1.1 201 CREATED\r\n"
 		}
 	} else {
 		resp = "HTTP/1.1 404 NOT FOUND\r\n"
