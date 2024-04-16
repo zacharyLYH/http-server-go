@@ -9,6 +9,13 @@ import (
 )
 
 func main() {
+
+	extraArg := ""
+	for i := 1; i < len(os.Args)-1; i++ {
+		if os.Args[i] == "--directory" {
+			extraArg = os.Args[i+1] // Get the next argument after "--directory"
+		}
+	}
 	// Listen on TCP port 4221 on all interfaces.
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
@@ -26,14 +33,18 @@ func main() {
 			continue
 		}
 
-		go handleConnection(conn) //stage 6. should handle concurrent connections easily
+		go handleConnection(conn,extraArg) //stage 6. should handle concurrent connections easily
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, extraArg string) {
 	defer conn.Close()
 
 	fmt.Println("Connection accepted")
+
+	if(extraArg != ""){
+		fmt.Println("Passed in argument: ", extraArg)
+	}
 
 	reader := bufio.NewReader(conn)
 
@@ -43,6 +54,7 @@ func handleConnection(conn net.Conn) {
 		if strings.TrimRight(line, "\r\n") == "" {
 			break
 		}
+		fmt.Println("Header: ", line)
 		if err != nil {
 			fmt.Println("Error reading from connection:", err.Error())
 			break
@@ -56,6 +68,7 @@ func handleConnection(conn net.Conn) {
 		userAgent = strings.TrimSpace(strings.Split(requestLines[2], " ")[1])
 		fmt.Println(len(userAgent))
 	}
+	method := (strings.Split(hasPath, " "))[0]
 	path := (strings.Split(hasPath, " "))[1]
 	omitEcho := strings.Split(path, "/echo/") //stage 4
 	var linesRead string 
@@ -65,21 +78,39 @@ func handleConnection(conn net.Conn) {
 		resp = "HTTP/1.1 200 OK\r\n"
 		resp += "Content-Type: text/plain\r\n"
 	} else if len(filesPrefix) > 1 {
-		fmt.Println("File being requested: ", filesPrefix[1])
+		fmt.Println("File name being requested: ", filesPrefix[1])
 		fileName := filesPrefix[1]
-		file, err := os.Open("/tmp/data/codecrafters.io/http-server-tester/"+fileName)
-		if err != nil {
-			resp = "HTTP/1.1 404 NOT FOUND\r\n"
-		}else{
-			defer file.Close()
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				line := scanner.Text()
-				linesRead += line
+		if(method == "GET"){
+			file, err := os.Open(extraArg+fileName)
+			if err != nil {
+				resp = "HTTP/1.1 404 NOT FOUND\r\n"
+			}else{
+				defer file.Close()
+				scanner := bufio.NewScanner(file)
+				for scanner.Scan() {
+					line := scanner.Text()
+					linesRead += line
+				}
+				resp = "HTTP/1.1 200 OK\r\n"
 			}
-			resp = "HTTP/1.1 200 OK\r\n"
+			resp += "Content-Type: application/octet-stream\r\n"
+		}else if(method == "POST"){
+			fmt.Println("Writing to file: ",extraArg+fileName)
+			file, err := os.Create(extraArg+fileName)
+			if err != nil {
+				fmt.Println("Error creating file:", err)
+				return
+			}
+			defer file.Close() 
+			data := requestLines[len(requestLines)-1]
+			fmt.Println("Data to write: ", data)
+			_, err = file.WriteString(data)
+			if err != nil {
+				fmt.Println("Error writing to file:", err)
+				return
+			}
+			resp = "HTTP/1.1 201 CREATED\r\n"
 		}
-		resp += "Content-Type: application/octet-stream\r\n"
 	} else {
 		resp = "HTTP/1.1 404 NOT FOUND\r\n"
 		resp += "Content-Type: text/plain\r\n"
