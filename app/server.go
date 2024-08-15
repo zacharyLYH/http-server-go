@@ -50,6 +50,7 @@ func handleConnection(conn net.Conn, extraArg string) {
 
 	var requestLines []string
 	bodyLength := 0
+	usesGzipEncoding := false
 	for {
 		line, err := reader.ReadString('\n')
 		trimmedLine := strings.TrimRight(line, "\r\n")
@@ -62,6 +63,9 @@ func handleConnection(conn net.Conn, extraArg string) {
 			break
 		}
 		requestLines = append(requestLines, line)
+		if strings.HasPrefix(trimmedLine, "Accept-Encoding: gzip") {
+			usesGzipEncoding = true
+		}
 		if strings.HasPrefix(trimmedLine, "Content-Length:") {
 			parts := strings.SplitN(trimmedLine, ":", 2)
 			if len(parts) == 2 {
@@ -85,6 +89,9 @@ func handleConnection(conn net.Conn, extraArg string) {
 	if path == "/" || len(omitEcho) > 1 || path == "/user-agent" { //stage 3
 		resp = "HTTP/1.1 200 OK\r\n"
 		resp += "Content-Type: text/plain\r\n"
+		if usesGzipEncoding {
+			resp += "Content-Encoding: gzip\r\n"
+		}
 	} else if len(filesPrefix) > 1 {
 		fmt.Println("File name being requested: ", filesPrefix[1])
 		fileName := filesPrefix[1]
