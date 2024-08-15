@@ -63,8 +63,10 @@ func handleConnection(conn net.Conn, extraArg string) {
 			break
 		}
 		requestLines = append(requestLines, line)
-		if strings.HasPrefix(trimmedLine, "Accept-Encoding: gzip") {
-			usesGzipEncoding = true
+		if strings.HasPrefix(trimmedLine, "Accept-Encoding: ") {
+			if strings.Contains(trimmedLine, "gzip") {
+				usesGzipEncoding = true
+			}
 		}
 		if strings.HasPrefix(trimmedLine, "Content-Length:") {
 			parts := strings.SplitN(trimmedLine, ":", 2)
