@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"net"
 	"os"
@@ -145,8 +147,26 @@ func handleConnection(conn net.Conn, extraArg string) {
 		resp += userAgent
 	} else if len(omitEcho) > 1 {
 		fmt.Println(omitEcho[1])
-		resp += fmt.Sprintf("Content-Length: %d\r\n\r\n", len([]byte(omitEcho[1])))
-		resp += omitEcho[1]
+		if usesGzipEncoding {
+			var buffer bytes.Buffer
+			gzipWriter := gzip.NewWriter(&buffer)
+			_, err := gzipWriter.Write([]byte(omitEcho[1]))
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			err = gzipWriter.Close()
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			fmt.Println("GZIP: ", buffer.Bytes())
+			resp += fmt.Sprintf("Content-Length: %d\r\n\r\n", buffer.Len())
+			resp += buffer.String()
+		} else {
+			resp += fmt.Sprintf("Content-Length: %d\r\n\r\n", len([]byte(omitEcho[1])))
+			resp += omitEcho[1]
+		}
 	} else if len(filesPrefix) > 1 {
 		resp += fmt.Sprintf("Content-Length: %d\r\n\r\n", len([]byte(linesRead)))
 		resp += linesRead
