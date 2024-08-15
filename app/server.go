@@ -98,7 +98,7 @@ func handleConnection(conn net.Conn, extraArg string) {
 		if method == "GET" {
 			file, err := os.Open(extraArg + fileName)
 			if err != nil {
-				resp = "HTTP/1.1 404 NOT FOUND\r\n"
+				resp = "HTTP/1.1 404 Not Found\r\n"
 			} else {
 				defer file.Close()
 				scanner := bufio.NewScanner(file)
@@ -130,11 +130,11 @@ func handleConnection(conn net.Conn, extraArg string) {
 					fmt.Println("Error writing to file:", err)
 					return
 				}
-				resp = "HTTP/1.1 201 CREATED\r\n"
+				resp = "HTTP/1.1 201 Created\r\n"
 			}
 		}
 	} else {
-		resp = "HTTP/1.1 404 NOT FOUND\r\n"
+		resp = "HTTP/1.1 404 Not Found\r\n"
 		resp += "Content-Type: text/plain\r\n"
 	}
 	//Set content-length and return body
